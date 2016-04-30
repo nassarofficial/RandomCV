@@ -53,14 +53,14 @@ def on_mouse(event, x, y, flag, param):
 
 
 def ImgEnrg(img, sigma):
-    blur = cv2.GaussianBlur(img,(int(math.ceil(3*sigma)), int(math.ceil(3*sigma))), 0)
+    blur = cv2.GaussianBlur(img, (int(math.ceil(3 * sigma)), int(math.ceil(3 * sigma))), 0)
 
     sobelx = cv2.Sobel(blur, cv2.CV_64F, 1, 0, ksize=5)
     sobely = cv2.Sobel(blur, cv2.CV_64F, 0, 1, ksize=5)
 
-    #cv2.imshow("blurred", np.sqrt(np.add(sobelx**2, sobely**2)))
-    #cv2.waitKey()
-    return np.sqrt(np.add(sobelx**2, sobely**2))
+    # cv2.imshow("blurred", np.sqrt(np.add(sobelx**2, sobely**2)))
+    # cv2.waitKey()
+    return np.sqrt(np.add(sobelx ** 2, sobely ** 2))
 
 
 def getAvgDist(points, n):
@@ -72,55 +72,119 @@ def getAvgDist(points, n):
     return avg
 
 
+def getModulo(i, n):
+    modI = np.remainder(i, n)
+
+    if modI == 0:
+        modI = n
+
+    modIminus = modI - 1
+    modIplus = modI + 1
+
+    if modIminus == 0:
+        modIminus = n
+
+    if modIplus > n:
+        modIplus = 1
+    return modI, modIminus, modIplus
+
+
 def GreedyAlgorithm(points, img, alpha, beta, gamma, s, sigma, maxIt):
     cThreshold = 0.3  # Set the curvature threshold
     imgEnrgT = 120  # Set the image energy threshold
     cnt = 0  # Define counter for the number of iterations
 
     # Initialize the alpha, beta and gamma values for each snake point
-    points = np.asarray(points)
     # Adding Columns
     lengthofrows = points.shape[0]
     z = np.zeros((lengthofrows, 3))
     points = np.concatenate((points, z), axis=1)
+
+    points[0] = np.array(points[0])
+    points[1] = np.array(points[1])
+
     points[:, 2] = alpha
     points[:, 3] = beta
     points[:, 4] = gamma
-
     # Round indices of snake points
+
+
     n = lengthofrows  # number of points in snake
 
     enrgImg = ImgEnrg(img, sigma)
+
     avgDist = getAvgDist(points, n)  # average distance between points
 
     a = s ** 2
     dist = np.floor(s / 2)
 
-    tmp = np.tile(((np.arange(1, s)) - s + dist), (s, 1))
+    tmp = np.tile(((np.arange(1, 6)) - s + dist), (s, 1))
+    sz = tmp.shape[0] * tmp.shape[1]
+    x1 = np.reshape(tmp, (a, 1))
+    x2 = np.reshape(tmp,(a,1),order='F')
 
-    ##offsets = reshape(tmp,a,1),reshape(tmp.T,a,1))) ################
-    #  (np.reshape(tmp,(a,1)), np.reshape(tmp.T,(a,1))), axis=1
+    offsets = np.hstack((x2,x1))
 
-    offsets = np.concatenate((np.reshape(tmp,(a,1)), np.reshape(tmp.T,(a,1))), axis=1)
-
-    print offsets
-    #Econt = np.zeros(1, a)
-    #Ecurv = np.zeros(1, a)
-    #Eimg = np.zeros(1, a)
-    #c = np.zeros(1, n)
+    Econt = np.zeros((1, a))
+    Ecurv = np.zeros((1, a))
+    Eimg = np.zeros((1, a))
+    c = np.zeros((1, n))
 
     flag = True
+    print offsets.shape
+    while flag == True:
+        pointsMoved = 0
+        p = np.random.permutation(n)
+    #
+    #     # Iterate through all snake points randomly
+        for k in range(p.shape[0]):
+            for i in range(p[k]):
+                modI, modIminus, modIplus = getModulo(i, n)
 
-    # while flag == True:
-    #    pointsMoved=0
-    #    p = randperm(n) ###################
+                y0 = np.arange(points[modI-1,0]-dist,points[modI-1,0]+dist)
+
+                y0 = np.append(y0,points[modI-1,0]+dist)
+                y1 = np.arange(points[modI-1,1]-dist,points[modI-1,1]+dist)
+                y1 = np.append(y1,points[modI-1,1]+dist)
+
+                neighborhood = np.zeros((5, 5))
+                for l in range(y0.shape[0]):
+                    for m in range(y1.shape[0]):
+                        neighborhood[l][m] = enrgImg[y0[l],y1[m]]
+
+                enrgMin = np.amin(neighborhood)
+                enrgMax = np.amax(neighborhood)
+
+                if (enrgMax - enrgMin) < 5:
+                    enrgMin = enrgMax - 5
+
+                normNeigh = (enrgMin - neighborhood) / (enrgMax - enrgMin)
+                pos = np.array([0, 0])
+                print offsets
+                for j in range(a):
+                    pos = points[i,[0,2]] + offsets[j]
+                    
+
+        #
+        #         Econt = Econt / max(Econt) ###
+        #         Ecurv = Ecurv / max(Ecurv) ###
+
+
+
 
 
 if __name__ == "__main__":
-    img = cv2.imread('ct.jpg', 0)
+    img = cv2.imread('shark1.png', 0)
+    pointselection = "wd"
+    if pointselection == "user":
+        points = contour_selection(img, "Selection of points")
+    else:
+        points = np.array([219,218,215,211,207,201,195,188,180,172,163,154,146,137,128,120,112,105,99,93,89,119,127,136,144,151,158,164,169,173,177,179,180,180,179,177,173,169,164,158,151,144,85,82,81,80,81,82,85,89,93,99,105,112,120,128,137,146,154,163,172,180,188,136,127,119,110,101,93,84,76,69,62,56,51,47,43,41,40,40,41,43,47,51,195,201,207,211,215,218,219,220,56,62,69,76,84,93,101,110])
+        points = np.reshape(points, (-1, 2))
+    # for i in range(50):
+    #     points[i][j] = c[0] + math.floor(r * math.cos((i) * 2 * math.pi / i) + 0.5)
+    #     points[i][j] = c[1] + math.floor(r * math.sin((i) * 2 * math.pi / i) + 0.5)
 
-    #points = contour_selection(img, "Selection of points")
-    points = [[2,2],[4,4],[6,6],[8,8]]
     alpha = 0.05  # controls continuity
     beta = 1  # controls curvature
     gamma = 1.2  # controls strength of image energy
