@@ -1,7 +1,6 @@
 import cv2
 import numpy as np
 from matplotlib import pyplot as plt
-import time
 import math
 
 flag_drawing = False
@@ -90,6 +89,7 @@ def getModulo(i, n):
 
 
 def GreedyAlgorithm(points, img, alpha, beta, gamma, s, sigma, maxIt):
+    counter = 0
     cThreshold = 0.3  # Set the curvature threshold
     imgEnrgT = 120  # Set the image energy threshold
     cnt = 0  # Define counter for the number of iterations
@@ -121,36 +121,43 @@ def GreedyAlgorithm(points, img, alpha, beta, gamma, s, sigma, maxIt):
     tmp = np.tile(((np.arange(1, 6)) - s + dist), (s, 1))
     sz = tmp.shape[0] * tmp.shape[1]
     x1 = np.reshape(tmp, (a, 1))
-    x2 = np.reshape(tmp,(a,1),order='F')
+    x2 = np.reshape(tmp, (a, 1), order='F')
 
-    offsets = np.hstack((x2,x1))
+    offsets = np.hstack((x2, x1))
 
-    Econt = np.zeros((1, a))
-    Ecurv = np.zeros((1, a))
-    Eimg = np.zeros((1, a))
-    c = np.zeros((1, n))
+    Econt = []
+    Ecurv = []
+    Eimg = []
+    c = []
+    cellArray = np.array([])
 
+    I = [1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5, 1, 2, 3, 4, 5]
+    J = [1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5]
     flag = True
-    print offsets.shape
+
     while flag == True:
         pointsMoved = 0
         p = np.random.permutation(n)
-    #
-    #     # Iterate through all snake points randomly
+        #
+        #     # Iterate through all snake points randomly
         for k in range(p.shape[0]):
             for i in range(p[k]):
+                Econt = []
+                Ecurv = []
+                Eimg = []
+
                 modI, modIminus, modIplus = getModulo(i, n)
 
-                y0 = np.arange(points[modI-1,0]-dist,points[modI-1,0]+dist)
+                y0 = np.arange(points[modI - 1, 0] - dist, points[modI - 1, 0] + dist)
 
-                y0 = np.append(y0,points[modI-1,0]+dist)
-                y1 = np.arange(points[modI-1,1]-dist,points[modI-1,1]+dist)
-                y1 = np.append(y1,points[modI-1,1]+dist)
+                y0 = np.append(y0, points[modI - 1, 0] + dist)
+                y1 = np.arange(points[modI - 1, 1] - dist, points[modI - 1, 1] + dist)
+                y1 = np.append(y1, points[modI - 1, 1] + dist)
 
                 neighborhood = np.zeros((5, 5))
                 for l in range(y0.shape[0]):
                     for m in range(y1.shape[0]):
-                        neighborhood[l][m] = enrgImg[y0[l],y1[m]]
+                        neighborhood[l][m] = enrgImg[y0[l], y1[m]]
 
                 enrgMin = np.amin(neighborhood)
                 enrgMax = np.amax(neighborhood)
@@ -160,37 +167,80 @@ def GreedyAlgorithm(points, img, alpha, beta, gamma, s, sigma, maxIt):
 
                 normNeigh = (enrgMin - neighborhood) / (enrgMax - enrgMin)
                 pos = np.array([0, 0])
-                print offsets
+                # print offsets
                 for j in range(a):
-                    pos = points[i,[0,2]] + offsets[j]
-                    
+                    print j
+                    pos = points[i, [0, 2]] + offsets[j]
+                    Econt.append(abs(avgDist - np.linalg.norm(np.subtract(pos, points[modIminus, [0, 2]]))))
+                    Ecurv.append(np.linalg.norm(
+                        np.subtract(points[modIminus, [0, 2]], 2 * pos + points[modIminus, [0, 2]])) ** 2)
+                    Eimg.append(normNeigh[I[j] - 1, J[j] - 1])
 
-        #
-        #         Econt = Econt / max(Econt) ###
-        #         Ecurv = Ecurv / max(Ecurv) ###
+                Econt = Econt / max(Econt)
+                Ecurv = Ecurv / max(Ecurv)
 
+                Esnake = points[i, 3] * Econt + points[i, 4] * Ecurv + points[i, 5] * Eimg
+                dummy, indexMin = min(Esnake)
 
+                if math.ceil(a / 2) != indexMin:
+                    points[modI, [0, 2]] = np.add(points[modI, [0, 2]], offsets[indexMin])
+                    pointsMoved = pointsMoved + 1
 
+                points[6, modI] = neighborhood[I(indexMin) - 1, J(indexMin) - 1]
 
+            for j in range(n):
+                modI, modIminus, modIplus = getModulo(i, n)
+                if (c[modI] > c[modIminus] and c[modI] > c[modIplus] and c[modI] > cThreshold and points[
+                    6, modI] > imgEnrgT and points[4, modI] != 0):
+                    points[4, modI] = 0
+                    print 'Relaxed beta for point nr. ' +  i
 
-if __name__ == "__main__":
-    img = cv2.imread('shark1.png', 0)
-    pointselection = "wd"
-    if pointselection == "user":
-        points = contour_selection(img, "Selection of points")
-    else:
-        points = np.array([219,218,215,211,207,201,195,188,180,172,163,154,146,137,128,120,112,105,99,93,89,119,127,136,144,151,158,164,169,173,177,179,180,180,179,177,173,169,164,158,151,144,85,82,81,80,81,82,85,89,93,99,105,112,120,128,137,146,154,163,172,180,188,136,127,119,110,101,93,84,76,69,62,56,51,47,43,41,40,40,41,43,47,51,195,201,207,211,215,218,219,220,56,62,69,76,84,93,101,110])
-        points = np.reshape(points, (-1, 2))
-    # for i in range(50):
-    #     points[i][j] = c[0] + math.floor(r * math.cos((i) * 2 * math.pi / i) + 0.5)
-    #     points[i][j] = c[1] + math.floor(r * math.sin((i) * 2 * math.pi / i) + 0.5)
+            counter += 1
+            cellArray[counter] = points
 
-    alpha = 0.05  # controls continuity
-    beta = 1  # controls curvature
-    gamma = 1.2  # controls strength of image energy
-    s = 5  # controls the size of the neighborhood
-    sigma = 15  # controls amount of Gaussian blurring
-    maxIt = 200  # Defines the maximum number of snake iterations
-    rs = "on"  # Controls whether to have resmapling on or off
+            if (counter == maxIt or pointsMoved < 3):
+                flag = False
+                cellArray = cellArray[1:counter]
 
-    GreedyAlgorithm(points, img, alpha, beta, gamma, s, sigma, maxIt)
+            avgDist = getAvgDist(points, n)
+
+            return points
+
+    def displaypoints(img,points):
+        img = plt.imread(img)
+        implot = plt.imshow(img)
+        plt.scatter(points)
+        plt.show()
+
+    if __name__ == "__main__":
+        img = cv2.imread('shark1.png', 0)
+        pointselection = "wd"
+        if pointselection == "user":
+            points = contour_selection(img, "Selection of points")
+        else:
+            points = np.array(
+                [219, 218, 215, 211, 207, 201, 195, 188, 180, 172, 163, 154, 146, 137, 128, 120, 112, 105, 99, 93, 89,
+                 119,
+                 127, 136, 144, 151, 158, 164, 169, 173, 177, 179, 180, 180, 179, 177, 173, 169, 164, 158, 151, 144, 85,
+                 82,
+                 81, 80, 81, 82, 85, 89, 93, 99, 105, 112, 120, 128, 137, 146, 154, 163, 172, 180, 188, 136, 127, 119,
+                 110,
+                 101, 93, 84, 76, 69, 62, 56, 51, 47, 43, 41, 40, 40, 41, 43, 47, 51, 195, 201, 207, 211, 215, 218, 219,
+                 220, 56, 62, 69, 76, 84, 93, 101, 110])
+            points = np.reshape(points, (-1, 2))
+        # for i in range(50):
+        #     points[i][j] = c[0] + math.floor(r * math.cos((i) * 2 * math.pi / i) + 0.5)
+        #     points[i][j] = c[1] + math.floor(r * math.sin((i) * 2 * math.pi / i) + 0.5)
+
+        alpha = 0.05  # controls continuity
+        beta = 1  # controls curvature
+        gamma = 1.2  # controls strength of image energy
+        s = 5  # controls the size of the neighborhood
+        sigma = 15  # controls amount of Gaussian blurring
+        maxIt = 200  # Defines the maximum number of snake iterations
+        rs = "on"  # Controls whether to have resmapling on or off
+
+        C = GreedyAlgorithm(points, img, alpha, beta, gamma, s, sigma, maxIt)
+        #print C
+        displaypoints(img,C)
+
